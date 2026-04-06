@@ -197,14 +197,17 @@ const App: React.FC = () => {
 
   const handleSaveOrUpdateCase = async (finalCase: CaseData) => {
     try {
-      const caseDoc = doc(db, 'cases', finalCase.id);
-      await setDoc(caseDoc, finalCase);
+      // Remove undefined values to prevent Firestore errors (deep sanitize)
+      const sanitizedCase = JSON.parse(JSON.stringify(finalCase));
       
-      if (activeCase?.id === finalCase.id) {
-        setActiveCase(finalCase);
+      const caseDoc = doc(db, 'cases', sanitizedCase.id);
+      await setDoc(caseDoc, sanitizedCase);
+      
+      if (activeCase?.id === sanitizedCase.id) {
+        setActiveCase(sanitizedCase);
       }
 
-      const isUpdate = cases.some(c => c.id === finalCase.id);
+      const isUpdate = cases.some(c => c.id === sanitizedCase.id);
       triggerToast(isUpdate ? "Data Berhasil Diperbarui" : "Data Berhasil Tersimpan di Berkas Terinput");
       setView('list');
       setActiveCase(null);
