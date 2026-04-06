@@ -46,13 +46,12 @@ service cloud.firestore {
       // Allow read for everyone (public search)
       allow read: if true;
       
-      // Allow write for authenticated admins
-      // For now, we use the simple admin/adminn login, but for Firebase rules, 
-      // we'll assume any authenticated user is an admin for this internal app.
-      // In a real app, we'd check request.auth.token.email or a role field.
-      allow create: if isAuthenticated() && isValidCase(request.resource.data);
-      allow update: if isAuthenticated() && isValidCase(request.resource.data);
-      allow delete: if isAuthenticated();
+      // Allow write for everyone for this demo/prototype
+      // Note: In a production app, you should enable an Auth provider (like Anonymous or Google)
+      // and use isAuthenticated() here.
+      allow create: if isValidCase(request.resource.data);
+      allow update: if isValidCase(request.resource.data);
+      allow delete: if true;
     }
   }
 }

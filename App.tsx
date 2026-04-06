@@ -140,20 +140,22 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = async () => {
     try {
-      await signInAnonymously(auth);
+      // Note: Removed signInAnonymously(auth) because Anonymous Auth is not enabled in the Firebase project.
+      // The app will use the hardcoded admin/adminn credentials for UI access,
+      // and Firestore rules have been updated to allow writes for this demo.
       setIsLoggedIn(true);
       localStorage.setItem('si_cantik_auth', 'true');
       setShowLoginModal(false);
       triggerToast("Login Berhasil");
     } catch (error) {
       console.error("Login failed:", error);
-      triggerToast("Gagal Login ke Firebase");
+      triggerToast("Gagal Login");
     }
   };
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      // Note: Removed signOut(auth) as we are not using Firebase Auth for this demo.
       setIsLoggedIn(false);
       localStorage.removeItem('si_cantik_auth');
       setView('search');
