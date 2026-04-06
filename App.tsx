@@ -124,7 +124,7 @@ const App: React.FC = () => {
     const q = query(collection(db, 'cases'), orderBy('decisionDate', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const casesData = snapshot.docs.map(doc => doc.data() as CaseData);
-      setCases(casesData.length > 0 ? casesData : MOCK_CASES);
+      setCases(casesData);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'cases');
     });
@@ -220,9 +220,29 @@ const App: React.FC = () => {
         setActiveCase(null);
       }
       triggerToast("Data Berhasil Dihapus");
-      setView('list');
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `cases/${id}`);
+    }
+  };
+
+  const handleDeleteAllCases = async () => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus SEMUA data perkara? Tindakan ini tidak dapat dibatalkan.")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Firestore doesn't have a "delete all" in client SDK, so we delete each one
+      const deletePromises = cases.map(c => deleteDoc(doc(db, 'cases', c.id)));
+      await Promise.all(deletePromises);
+      
+      setActiveCase(null);
+      triggerToast("Semua Data Berhasil Dihapus");
+    } catch (error) {
+      console.error("Error deleting all cases:", error);
+      triggerToast("Gagal menghapus semua data");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -330,6 +350,7 @@ const App: React.FC = () => {
               cases={cases} 
               onSelectCase={selectCaseForEdit}
               onDeleteCase={handleDeleteCase}
+              onDeleteAll={handleDeleteAllCases}
               onUpdateCase={handleSaveOrUpdateCase}
             />
           ) : (

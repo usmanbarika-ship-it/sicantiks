@@ -7,10 +7,11 @@ interface CaseListProps {
   cases: CaseData[];
   onSelectCase: (caseData: CaseData) => void;
   onDeleteCase: (id: string) => void;
+  onDeleteAll: () => void;
   onUpdateCase: (updatedCase: CaseData) => void;
 }
 
-const CaseList: React.FC<CaseListProps> = ({ cases, onSelectCase, onDeleteCase, onUpdateCase }) => {
+const CaseList: React.FC<CaseListProps> = ({ cases, onSelectCase, onDeleteCase, onDeleteAll, onUpdateCase }) => {
   const [activeTab, setActiveTab] = useState<CaseType>(CaseType.GUGATAN);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -52,15 +53,25 @@ const CaseList: React.FC<CaseListProps> = ({ cases, onSelectCase, onDeleteCase, 
               <p className="text-slate-500 text-sm">Manajemen registrasi dan monitoring status minutasi perkara.</p>
             </div>
             
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input 
-                type="text"
-                placeholder="Cari berkas..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
-              />
+            <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+              <button 
+                onClick={onDeleteAll}
+                className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-600 hover:text-white transition-all border border-red-100"
+              >
+                <Trash2 className="w-4 h-4" />
+                Hapus Semua Data
+              </button>
+              
+              <div className="relative w-full md:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input 
+                  type="text"
+                  placeholder="Cari berkas..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                />
+              </div>
             </div>
           </div>
 
