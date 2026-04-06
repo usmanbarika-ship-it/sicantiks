@@ -1,0 +1,36 @@
+{
+  "entities": {
+    "Case": {
+      "title": "Case",
+      "description": "Perkara hukum yang ditangani oleh pengadilan.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik perkara." },
+        "caseNumber": { "type": "string", "description": "Nomor perkara lengkap." },
+        "caseType": { "type": "string", "enum": ["Gugatan", "Permohonan"], "description": "Jenis perkara." },
+        "classification": { "type": "string", "description": "Klasifikasi perkara." },
+        "parties": { "type": "string", "description": "Pihak-pihak yang terlibat." },
+        "decisionDate": { "type": "string", "format": "date", "description": "Tanggal putusan." },
+        "bhtDate": { "type": "string", "format": "date", "description": "Tanggal BHT/Inkracht." },
+        "isArchived": { "type": "boolean", "description": "Status apakah berkas sudah diarsipkan." },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "roomNo": { "type": "string" },
+            "shelfNo": { "type": "string" },
+            "levelNo": { "type": "string" },
+            "boxNo": { "type": "string" }
+          }
+        },
+        "pdfUrl": { "type": "string", "description": "URL dokumen PDF." }
+      },
+      "required": ["id", "caseNumber", "caseType", "classification", "parties", "decisionDate", "isArchived"]
+    }
+  },
+  "firestore": {
+    "/cases/{caseId}": {
+      "schema": "Case",
+      "description": "Koleksi berkas perkara."
+    }
+  }
+}

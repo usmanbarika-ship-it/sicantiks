@@ -5,6 +5,9 @@ import {
   Search, QrCode, FileSearch, Scale, AlertCircle, Loader2, 
   PlusCircle, LayoutDashboard, ListFilter, CheckCircle2, X, LogOut, LogIn 
 } from 'lucide-react';
+import { collection, onSnapshot, query, orderBy, doc, deleteDoc, setDoc, getDocFromServer } from 'firebase/firestore';
+import { signInAnonymously, onAuthStateChanged, signOut } from 'firebase/auth';
+import { db, auth } from './firebase';
 import { CaseData, CaseType, SearchParams } from './types';
 import { MOCK_CASES } from './constants';
 import CaseDetails from './components/CaseDetails';
@@ -13,16 +16,65 @@ import AddCaseForm from './components/AddCaseForm';
 import CaseList from './components/CaseList';
 import LoginModal from './components/LoginModal';
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return localStorage.getItem('si_cantik_auth') === 'true';
   });
   const [showLoginModal, setShowLoginModal] = useState(false);
   
-  const [cases, setCases] = useState<CaseData[]>(() => {
-    const saved = localStorage.getItem('e_minutasi_cases');
-    return saved ? JSON.parse(saved) : MOCK_CASES;
-  });
+  const [cases, setCases] = useState<CaseData[]>([]);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   
   const [view, setView] = useState<'search' | 'add' | 'list'>('search');
   const [params, setParams] = useState<SearchParams>({
@@ -37,10 +89,48 @@ const App: React.FC = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [showToast, setShowToast] = useState<{show: boolean, message: string}>({ show: false, message: '' });
 
-  // Sinkronisasi database lokal ke Storage
+  // Test connection to Firestore
   useEffect(() => {
-    localStorage.setItem('e_minutasi_cases', JSON.stringify(cases));
-  }, [cases]);
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if(error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration. ");
+        }
+      }
+    }
+    testConnection();
+  }, []);
+
+  // Auth listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsAuthReady(true);
+      if (!user && isLoggedIn) {
+        // If we think we are logged in but Firebase says no, sign in anonymously
+        // for the public search functionality if needed, or just let it be.
+        // Actually, for this app, we'll use anonymous auth for the admin session
+        // if the user provided the correct credentials.
+      }
+    });
+    return () => unsubscribe();
+  }, [isLoggedIn]);
+
+  // Real-time data listener
+  useEffect(() => {
+    if (!isAuthReady) return;
+
+    const q = query(collection(db, 'cases'), orderBy('decisionDate', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const casesData = snapshot.docs.map(doc => doc.data() as CaseData);
+      setCases(casesData.length > 0 ? casesData : MOCK_CASES);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'cases');
+    });
+
+    return () => unsubscribe();
+  }, [isAuthReady]);
 
   // Handler Notifikasi
   const triggerToast = (message: string) => {
@@ -48,18 +138,29 @@ const App: React.FC = () => {
     setTimeout(() => setShowToast({ show: false, message: '' }), 3000);
   };
 
-  const handleLoginSuccess = () => {
-    setIsLoggedIn(true);
-    localStorage.setItem('si_cantik_auth', 'true');
-    setShowLoginModal(false);
-    triggerToast("Login Berhasil");
+  const handleLoginSuccess = async () => {
+    try {
+      await signInAnonymously(auth);
+      setIsLoggedIn(true);
+      localStorage.setItem('si_cantik_auth', 'true');
+      setShowLoginModal(false);
+      triggerToast("Login Berhasil");
+    } catch (error) {
+      console.error("Login failed:", error);
+      triggerToast("Gagal Login ke Firebase");
+    }
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    localStorage.removeItem('si_cantik_auth');
-    setView('search');
-    triggerToast("Berhasil Logout");
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setIsLoggedIn(false);
+      localStorage.removeItem('si_cantik_auth');
+      setView('search');
+      triggerToast("Berhasil Logout");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   const handleSearch = async (e?: React.FormEvent) => {
@@ -92,33 +193,35 @@ const App: React.FC = () => {
     }, 400);
   };
 
-  const handleSaveOrUpdateCase = (finalCase: CaseData) => {
-    const isUpdate = cases.some(c => c.id === finalCase.id);
-    
-    setCases(prev => {
-      if (isUpdate) {
-        return prev.map(c => c.id === finalCase.id ? finalCase : c);
-      } else {
-        return [finalCase, ...prev]; // Tambahkan di paling atas
+  const handleSaveOrUpdateCase = async (finalCase: CaseData) => {
+    try {
+      const caseDoc = doc(db, 'cases', finalCase.id);
+      await setDoc(caseDoc, finalCase);
+      
+      if (activeCase?.id === finalCase.id) {
+        setActiveCase(finalCase);
       }
-    });
-    
-    if (activeCase?.id === finalCase.id) {
-      setActiveCase(finalCase);
-    }
 
-    triggerToast(isUpdate ? "Data Berhasil Diperbarui" : "Data Berhasil Tersimpan di Berkas Terinput");
-    setView('list');
-    setActiveCase(null);
+      const isUpdate = cases.some(c => c.id === finalCase.id);
+      triggerToast(isUpdate ? "Data Berhasil Diperbarui" : "Data Berhasil Tersimpan di Berkas Terinput");
+      setView('list');
+      setActiveCase(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `cases/${finalCase.id}`);
+    }
   };
 
-  const handleDeleteCase = (id: string) => {
-    setCases(prev => prev.filter(c => c.id !== id));
-    if (activeCase?.id === id) {
-      setActiveCase(null);
+  const handleDeleteCase = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'cases', id));
+      if (activeCase?.id === id) {
+        setActiveCase(null);
+      }
+      triggerToast("Data Berhasil Dihapus");
+      setView('list');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `cases/${id}`);
     }
-    triggerToast("Data Berhasil Dihapus");
-    setView('list');
   };
 
   const handleScanSuccess = (result: string) => {

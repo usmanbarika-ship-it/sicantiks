@@ -67,11 +67,9 @@ const AddCaseForm: React.FC<AddCaseFormProps> = ({ onSave, onCancel, onDelete, i
       pdfUrl: pdfUrl
     };
 
-    // Simulasi delay penyimpanan ke "database"
-    setTimeout(() => {
-      onSave(finalCase);
-      setIsSubmitting(false);
-    }, 600);
+    // Simpan ke Firestore melalui prop onSave
+    onSave(finalCase);
+    setIsSubmitting(false);
   };
 
   const handleResetMinutasi = () => {

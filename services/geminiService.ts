@@ -2,9 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CaseData, CaseType } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = process.env.API_KEY || "";
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export async function generateCaseDetails(caseNumber: string, type: CaseType): Promise<Partial<CaseData>> {
+  if (!ai) {
+    console.warn("Gemini API key is missing. Skipping AI generation.");
+    return {};
+  }
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

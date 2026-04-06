@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: cases
+    // Document ID: {caseId}
+    // Fields:
+    //   - id: string (required) - ID unik perkara.
+    //   - caseNumber: string (required) - Nomor perkara lengkap.
+    //   - caseType: string (required, enum: ['Gugatan', 'Permohonan']) - Jenis perkara.
+    //   - classification: string (required) - Klasifikasi perkara.
+    //   - parties: string (required) - Pihak-pihak yang terlibat.
+    //   - decisionDate: string (required, format: date) - Tanggal putusan.
+    //   - bhtDate: string (optional, format: date) - Tanggal BHT/Inkracht.
+    //   - isArchived: bool (required) - Status apakah berkas sudah diarsipkan.
+    //   - storage: map (optional) - Lokasi fisik arsip.
+    //   - pdfUrl: string (optional) - URL dokumen PDF.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isValidCase(data) {
+      return data.keys().hasAll(['id', 'caseNumber', 'caseType', 'classification', 'parties', 'decisionDate', 'isArchived']) &&
+             data.id is string &&
+             data.caseNumber is string && data.caseNumber.size() < 100 &&
+             data.caseType in ['Gugatan', 'Permohonan'] &&
+             data.classification is string && data.classification.size() < 200 &&
+             data.parties is string && data.parties.size() < 500 &&
+             data.decisionDate is string &&
+             data.isArchived is bool &&
+             (!('bhtDate' in data) || data.bhtDate is string) &&
+             (!('pdfUrl' in data) || data.pdfUrl is string) &&
+             (!('storage' in data) || data.storage is map);
+    }
+
+    match /cases/{caseId} {
+      // Allow read for everyone (public search)
+      allow read: if true;
+      
+      // Allow write for authenticated admins
+      // For now, we use the simple admin/adminn login, but for Firebase rules, 
+      // we'll assume any authenticated user is an admin for this internal app.
+      // In a real app, we'd check request.auth.token.email or a role field.
+      allow create: if isAuthenticated() && isValidCase(request.resource.data);
+      allow update: if isAuthenticated() && isValidCase(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+  }
+}
